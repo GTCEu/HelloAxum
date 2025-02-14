@@ -1,14 +1,30 @@
 #![allow(unused)]
 
+pub use self::error::{Error,Result};
+
 use std::{net::SocketAddr};
-use axum::{extract::{Path, Query}, response::{Html, IntoResponse}, routing::{get, get_service}, Router};
+use axum::{extract::{Path, Query}, middleware, response::{Html, IntoResponse, Response}, routing::{get, get_service}, Router};
+use model::ModelController;
 use serde::{ser::Impossible, Deserialize};
+use tower_cookies::CookieManagerLayer;
 use tower_http::{services::ServeDir};
 
+mod error;
+mod model;
+mod web;
+
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()>{
+    // init mc
+    let mc = ModelController::new().await?;
+    
+
     let router_all = Router::new()
     .merge(routes_hello())
+    .merge(web::routes_login::routes())
+    .nest("/api", web::routes_tickets::routes(mc.clone()))
+    .layer(middleware::map_response(main_response_mapper))
+    .layer(CookieManagerLayer::new())
     .fallback_service(route_static());
     
     let address= SocketAddr::from(([127, 0, 0, 1], 8080));
@@ -18,36 +34,46 @@ async fn main() {
         .await
         .unwrap();
 
-    fn route_static() -> Router {
-        Router::new().fallback_service(get_service(ServeDir::new("./")))
-    }
+    Ok(())
+}
 
-    fn routes_hello() -> Router {
-        Router::new()
-        .route("/hello", get(handler_hello))
-        .route("/hello2/{name}", get(handler_hello2))
-    }
+async fn main_response_mapper(res: Response) -> Response {
+    println!("!! {:<12} - main_response_mapper", "RES_MAPPER");
 
-    #[derive(Debug, Deserialize)]
-    struct HelloParams {
-        name: Option<String>
-    }
+    println!();
+    res
+}    
 
-    // e.g. `/hello?name=param`
-    async fn handler_hello(params: Query<HelloParams>) -> impl IntoResponse {
-        println!("!! {:<12} - handler_hello - {params:?}", "HANDLER");
+fn route_static() -> Router {
+    Router::new().fallback_service(get_service(ServeDir::new("./")))
+}
 
-        let name = params.name.as_deref().unwrap_or("Missing");
+fn routes_hello() -> Router {
+    Router::new()
+    .route("/hello", get(handler_hello))
+    .route("/hello2/{name}", get(handler_hello2))
+}
 
-        Html(format!(" 🐈 Hello {name} ") )
-    }
+#[derive(Debug, Deserialize)]
+struct HelloParams {
+    name: Option<String>
+}
 
-    // e.g. `/hello2/param`
-    async fn handler_hello2(Path(name): Path<String>) -> impl IntoResponse {
-        println!("!! {:<12} - handler_hello - {name:?}", "HANDLER");
+// e.g. `/hello?name=param`
+async fn handler_hello(params: Query<HelloParams>) -> impl IntoResponse {
+    println!("!! {:<12} - handler_hello - {params:?}", "HANDLER");
 
-        Html(format!(" 🐈 Hello {name} ") )
-    };
+    let name = params.name.as_deref().unwrap_or("Missing");
 
-} //$ cargo install cargo-watch
+    Html(format!(" 🐈 Hello {name} ") )
+}
+
+// e.g. `/hello2/param`
+async fn handler_hello2(Path(name): Path<String>) -> impl IntoResponse {
+    println!("!! {:<12} - handler_hello - {name:?}", "HANDLER");
+
+    Html(format!(" 🐈 Hello {name} ") )
+}
+
+//$ cargo install cargo-watch
 //$ cargo watch -q -c -w src/ -x run
