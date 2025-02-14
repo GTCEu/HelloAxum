@@ -1,0 +1,13 @@
+[package]
+name = "axu"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.8.1"
+axum-server = "0.7.1"
+tokio = { version = "1.43.0", features = ["full", "rt-multi-thread"] } # "1.43.0"
+
+[dev-dependencies]
+anyhow = "1.0.95"
+httpc-test = "0.1.10"
