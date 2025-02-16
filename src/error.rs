@@ -6,6 +6,8 @@ pub type Result<T> = core::result::Result<T, Error>;
 #[derive(Debug)]
 pub enum Error {
     LoginFail,
+    //---- auth err
+    AuthFailNoAuthTokenCookie,
 
     //---- model err
     TicketDeleteFailIdNotFound { id: u64 },
